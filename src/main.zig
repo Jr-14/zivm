@@ -4,6 +4,9 @@ const http = std.http;
 const ziglang_host_name = "ziglang.org";
 
 pub fn main(init: std.process.Init) !void {
+    var body: std.Io.Writer.Allocating = .init(init.gpa);
+    defer body.deinit();
+
     var client = http.Client{
         .allocator = init.gpa,
         .io = init.io,
@@ -13,7 +16,12 @@ pub fn main(init: std.process.Init) !void {
     const result = try client.fetch(.{
         .location = .{ .uri =  uri },
         .method = .GET,
+        .response_writer = &body.writer,
     });
+
     std.debug.print("{}\n", .{ result.status });
+
+    const text = body.written();
+    std.debug.print("{s}\n", .{ text });
 }
 
