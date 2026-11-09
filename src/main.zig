@@ -1,5 +1,6 @@
 const std = @import("std");
 const http = std.http;
+const json = std.json;
 
 const ziglang_host_name = "ziglang.org";
 
@@ -16,6 +17,11 @@ pub fn main(init: std.process.Init) !void {
     const result = try client.fetch(.{
         .location = .{ .uri =  uri },
         .method = .GET,
+        .headers = .{
+            .user_agent = .{
+                .override = "zivm/0.1.0"
+            },
+        },
         .response_writer = &body.writer,
     });
 
