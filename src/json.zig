@@ -10,11 +10,10 @@ const ZigIndex = struct {
     master: Meta,
 };
 
-pub fn tryThis(comptime T: type, allocator: std.mem.Allocator, value: []const u8) !void {
+pub fn tryThis(comptime T: type, allocator: std.mem.Allocator, value: []const u8) !T {
     const parsed = try json.parseFromSlice(T, allocator, value, .{ .ignore_unknown_fields = true });
     defer parsed.deinit();
-    const zig_index = parsed.value;
-    std.debug.print("{}", .{ zig_index });
+    return parsed.value;
 }
 
 test "simple json parsing" {
@@ -27,5 +26,6 @@ test "simple json parsing" {
         \\  }
         \\}
     ;
-    try tryThis(ZigIndex, std.testing.allocator, value);
+    const wow = try tryThis(ZigIndex, std.testing.allocator, value);
+    std.debug.print("{s}\n", .{ wow.master.docs orelse "" });
 }
