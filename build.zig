@@ -4,6 +4,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const build_zig_zon = b.createModule(.{
+        .root_source_file = b.path("build.zig.zon"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const exe = b.addExecutable(.{
         .name = "zivm",
         .root_module = b.createModule(.{
@@ -12,6 +18,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+
+    exe.root_module.addImport("build.zig.zon", build_zig_zon);
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default

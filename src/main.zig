@@ -210,4 +210,3 @@ pub fn main(init: std.process.Init) !void {
     const release_history = try buildHistory(allocator, parsed_json.value);
     _ = release_history;
 }
-
