@@ -1,6 +1,7 @@
 const std = @import("std");
 const http = std.http;
 const json = std.json;
+const fetch = @import("fetch.zig").fetch;
 
 const ziglang_releases = "https://ziglang.org/download/index.json";
 const ziglang_mirrors = "https://ziglang.org/download/community-mirrors.txt";
@@ -76,6 +77,23 @@ const ReleaseHistory = struct {
     }
 };
 
+/// Fetch community mirrors download link
+fn fetchCommunityMirrors(io: std.Io, allocator: std.mem.Allocator) !void {
+    var body: std.Io.Writer.Allocating = .init(allocator);
+    defer body.deinit();
+
+    const status = try fetch(io, allocator, &body, .{
+        .url = "https://ziglang.org/download/community-mirrors.txt",
+    });
+
+    if (status != .ok) {
+        std.log.err("Failed to fetch - status: {any}, response: {any}", .{ status, body.written() });
+    }
+}
+
+/// This fetches the Full Release History of zig.
+///
+/// This typically includes but not limited to the zig version, targeted architectures, shasum, and tarball urls
 fn fetchIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value) {
     var client = http.Client{
         .allocator = allocator,
@@ -91,7 +109,7 @@ fn fetchIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value)
         .method = .GET,
         .headers = .{
             .user_agent = .{
-                .override = "zivm/0.1.0",
+                .override = "zivm/0.1.0", //TODO: update so that this uses actual zivm semantic version
             },
         },
         .response_writer = &body.writer,
