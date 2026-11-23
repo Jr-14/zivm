@@ -1,10 +1,7 @@
 const std = @import("std");
 const http = std.http;
 const json = std.json;
-const fetch = @import("fetch.zig").fetch;
-
-const ziglang_releases = "https://ziglang.org/download/index.json";
-const ziglang_mirrors = "https://ziglang.org/download/community-mirrors.txt";
+const fetch = @import("fetch.zig");
 
 const Architectures = enum {
     @"src",
@@ -34,11 +31,7 @@ const Architectures = enum {
     @"x86-linux",
     @"loongarch64-linux",
     @"s390x-linux",
-    @"powerpc64le-linux",
-    @"powerpc-linux",
-    @"aarch64-macos",
-    @"x86_64-macos",
-    @"i386-windows",
+    @"powerpc64le-linux", @"powerpc-linux", @"aarch64-macos", @"x86_64-macos", @"i386-windows",
     @"x86_64-windows",
     @"x86-windows",
     @"aarch64-windows",
@@ -76,20 +69,6 @@ const ReleaseHistory = struct {
         };
     }
 };
-
-/// Fetch community mirrors download link
-fn fetchCommunityMirrors(io: std.Io, allocator: std.mem.Allocator) !void {
-    var body: std.Io.Writer.Allocating = .init(allocator);
-    defer body.deinit();
-
-    const status = try fetch(io, allocator, &body, .{
-        .url = "https://ziglang.org/download/community-mirrors.txt",
-    });
-
-    if (status != .ok) {
-        std.log.err("Failed to fetch - status: {any}, response: {any}", .{ status, body.written() });
-    }
-}
 
 /// This fetches the Full Release History of zig.
 ///

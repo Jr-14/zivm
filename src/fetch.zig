@@ -1,5 +1,6 @@
 const std = @import("std");
 const http = std.http;
+const json = std.json;
 
 const FetchOptions = struct {
     client: ?*http.Client = null,
@@ -7,7 +8,7 @@ const FetchOptions = struct {
     user_agent: ?[]const u8 = null,
 };
 
-pub fn fetch(io: std.Io, allocator: std.mem.Allocator, response_writer: *std.Io.Writer, options: FetchOptions) !http.Status {
+fn fetch(io: std.Io, allocator: std.mem.Allocator, response_writer: *std.Io.Writer, options: FetchOptions) !http.Status {
     var owned_client: ?http.Client = null;
     const client: *http.Client = if (options.client) |provided| provided else blk: {
         owned_client = .{
@@ -32,7 +33,7 @@ pub fn fetch(io: std.Io, allocator: std.mem.Allocator, response_writer: *std.Io.
     return result.status;
 }
 
-const Mirrors = struct {
+pub const Mirrors = struct {
     allocator: std.mem.Allocator,
     bytes: []u8,
     lines: [][]const u8,
@@ -45,7 +46,7 @@ const Mirrors = struct {
 };
 
 /// Fetch community mirrors download link
-fn fetchCommunityMirrors(io: std.Io, allocator: std.mem.Allocator) !Mirrors {
+pub fn getCommunityMirrors(io: std.Io, allocator: std.mem.Allocator) !Mirrors {
     var body: std.Io.Writer.Allocating = .init(allocator);
     defer body.deinit();
 
@@ -79,11 +80,34 @@ fn fetchCommunityMirrors(io: std.Io, allocator: std.mem.Allocator) !Mirrors {
     };
 }
 
+pub fn getIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value) {
+    var body: std.Io.Writer.Allocating = .init(allocator);
+    defer body.deinit();
+
+    const status = try fetch(io, allocator, &body.writer, .{
+        .url = "https://ziglang.org/download/index.json"
+    });
+
+    if (status != .ok) {
+        std.log.err("Failed to fetch - status: {any}, response: {s}\n", .{ status, body.written() });
+        return error.FetchFailed;
+    }
+
+    return try json.parseFromSlice(json.Value, allocator, body.written(), .{ .ignore_unknown_fields = true });
+}
+
 test "fetch community mirrors" {
-    var mirrors = try fetchCommunityMirrors(std.testing.io, std.testing.allocator);
+    var mirrors = try getCommunityMirrors(std.testing.io, std.testing.allocator);
     defer mirrors.deinit();
 
     for (mirrors.lines) |line| {
         std.log.err("{s}", .{line});
     }
+}
+
+test "fetch zig index" {
+    const parsed_json = try getIndex(std.testing.io, std.testing.allocator);
+    defer parsed_json.deinit();
+
+    std.log.err("{any}", .{ parsed_json.value });
 }
