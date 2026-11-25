@@ -43,6 +43,11 @@ pub const Mirrors = struct {
         self.allocator.free(self.bytes);
         self.* = undefined;
     }
+
+    pub fn rand(self: *Mirrors, random: std.Random) []const u8 {
+        const idx = random.intRangeLessThan(u32, 0, @intCast(self.lines.len));
+        return self.lines[idx];
+    }
 };
 
 /// Fetch community mirrors download link
@@ -80,21 +85,11 @@ pub fn getCommunityMirrors(io: std.Io, allocator: std.mem.Allocator) !Mirrors {
     };
 }
 
-pub fn getRandomCommunityMirror(io: std.Io, allocator: std.mem.Allocator, random: std.Random) !u32 {
-    var mirrors = try getCommunityMirrors(io, allocator);
-    defer mirrors.deinit();
-    const ind = random.intRangeLessThan(u32, 0, @intCast(mirrors.lines.len));
-    std.debug.print("{d}\n", .{ ind });
-    return ind;
-}
-
 pub fn getIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value) {
     var body: std.Io.Writer.Allocating = .init(allocator);
     defer body.deinit();
 
-    const status = try fetch(io, allocator, &body.writer, .{
-        .url = "https://ziglang.org/download/index.json"
-    });
+    const status = try fetch(io, allocator, &body.writer, .{ .url = "https://ziglang.org/download/index.json" });
 
     if (status != .ok) {
         std.log.err("Failed to fetch - status: {any}, response: {s}\n", .{ status, body.written() });
@@ -104,19 +99,12 @@ pub fn getIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Valu
     return try json.parseFromSlice(json.Value, allocator, body.written(), .{ .ignore_unknown_fields = true });
 }
 
-test "getRandomCommunityMirror" {
-    const seed = std.testing.random_seed;
-    var prng = std.Random.DefaultPrng.init(seed);
-    const num = try getRandomCommunityMirror(std.testing.io, std.testing.allocator, prng.random());
-    try std.testing.expect(num > 0);
-}
-
 test "fetch community mirrors" {
     var mirrors = try getCommunityMirrors(std.testing.io, std.testing.allocator);
     defer mirrors.deinit();
 
     for (mirrors.lines, 0..) |line, ind| {
-        std.debug.print("{d}:  {s}\n", .{ind, line});
+        std.debug.print("{d}:  {s}\n", .{ ind, line });
     }
 }
 
@@ -124,5 +112,5 @@ test "fetch zig index" {
     const parsed_json = try getIndex(std.testing.io, std.testing.allocator);
     defer parsed_json.deinit();
 
-    std.log.err("{any}", .{ parsed_json.value });
+    std.log.err("{any}", .{parsed_json.value});
 }

@@ -8,8 +8,8 @@ const getCommunityMirrors = fetch.getCommunityMirrors;
 const getRandomCommunityMirrors = fetch.getRandomCommunityMirror;
 
 const Architectures = enum {
-    @"src",
-    @"bootstrap",
+    src,
+    bootstrap,
     @"aarch64-freebsd",
     @"arm-freebsd",
     @"powerpc64-freebsd",
@@ -35,7 +35,11 @@ const Architectures = enum {
     @"x86-linux",
     @"loongarch64-linux",
     @"s390x-linux",
-    @"powerpc64le-linux", @"powerpc-linux", @"aarch64-macos", @"x86_64-macos", @"i386-windows",
+    @"powerpc64le-linux",
+    @"powerpc-linux",
+    @"aarch64-macos",
+    @"x86_64-macos",
+    @"i386-windows",
     @"x86_64-windows",
     @"x86-windows",
     @"aarch64-windows",
@@ -78,10 +82,7 @@ const ReleaseHistory = struct {
 ///
 /// This typically includes but not limited to the zig version, targeted architectures, shasum, and tarball urls
 fn fetchIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value) {
-    var client = http.Client{
-        .allocator = allocator,
-        .io = io
-    };
+    var client = http.Client{ .allocator = allocator, .io = io };
     defer client.deinit();
 
     var body: std.Io.Writer.Allocating = .init(allocator);
@@ -99,7 +100,7 @@ fn fetchIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value)
     });
 
     if (result.status != .ok) {
-        std.log.err("Failed to retrieve Zig Version History\nGot non 200 status code: Received {d}\n", .{ result.status });
+        std.log.err("Failed to retrieve Zig Version History\nGot non 200 status code: Received {d}\n", .{result.status});
         return error.FetchError;
     }
 
@@ -111,7 +112,7 @@ fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory
     switch (index) {
         .object => |obj| {
             var outer_itr = obj.iterator();
-            while(outer_itr.next()) |entry| {
+            while (outer_itr.next()) |entry| {
                 const entry_key = entry.key_ptr.*;
                 const entry_value = entry.value_ptr.*;
 
@@ -126,42 +127,52 @@ fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory
                         var itr = inner_obj.iterator();
                         var architecture: std.StringHashMap(Source) = .init(allocator);
 
-                        while(itr.next()) |meta| {
+                        while (itr.next()) |meta| {
                             const meta_key = meta.key_ptr.*;
                             const meta_value = meta.value_ptr.*;
 
                             if (std.mem.eql(u8, meta_key, "version")) {
                                 switch (meta_value) {
-                                    .string => |text| { version = text; },
+                                    .string => |text| {
+                                        version = text;
+                                    },
                                     .null => {},
                                     else => return error.InvalidVersionField,
                                 }
                             } else if (std.mem.eql(u8, meta_key, "date")) {
                                 switch (meta_value) {
-                                    .string => |text| { date = text; },
+                                    .string => |text| {
+                                        date = text;
+                                    },
                                     .null => {},
                                     else => return error.InvalidDateField,
                                 }
                             } else if (std.mem.eql(u8, meta_key, "docs")) {
                                 switch (meta_value) {
-                                    .string => |text| { docs = text; },
+                                    .string => |text| {
+                                        docs = text;
+                                    },
                                     .null => {},
                                     else => return error.InvalidDocsField,
                                 }
                             } else if (std.mem.eql(u8, meta_key, "stdDocs")) {
                                 switch (meta_value) {
-                                    .string => |text| { std_docs = text; },
+                                    .string => |text| {
+                                        std_docs = text;
+                                    },
                                     .null => {},
                                     else => return error.InvalidStdDocsField,
                                 }
                             } else if (std.mem.eql(u8, meta_key, "notes")) {
                                 switch (meta_value) {
-                                    .string => |text| { notes = text; },
+                                    .string => |text| {
+                                        notes = text;
+                                    },
                                     .null => {},
                                     else => return error.InvalidNotesField,
                                 }
                             } else if (meta_value == .object) {
-                                const parsed = try json.parseFromValue(Source, allocator, meta_value, .{ .ignore_unknown_fields =  true });
+                                const parsed = try json.parseFromValue(Source, allocator, meta_value, .{ .ignore_unknown_fields = true });
                                 defer parsed.deinit();
                                 const source: Source = .{
                                     .tarball = try allocator.dupe(u8, parsed.value.tarball),
@@ -171,7 +182,7 @@ fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory
                                 try architecture.put(try allocator.dupe(u8, meta_key), source);
                             }
                         }
-                        
+
                         const required_docs = docs orelse return error.RequiredFieldDocs;
 
                         const v: Version = .{
@@ -201,14 +212,15 @@ fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
 
+    // Wondering if I can end up using std.Random.DefaultPrng since this takes a bit of time to run?
+    // Is it worth the time?
     var csprng: std.Random.IoSource = .{ .io = init.io };
     const random = csprng.interface();
 
-    const index = try getRandomCommunityMirrors(init.io, allocator, random);
     var mirrors = try getCommunityMirrors(init.io, allocator);
     defer mirrors.deinit();
 
-    const mirror = mirrors.lines[index];
+    const mirror = mirrors.rand(random);
 
     std.debug.print("{s}\n", .{mirror});
 
@@ -218,5 +230,5 @@ pub fn main(init: std.process.Init) !void {
 
     // const release_history = try buildHistory(allocator, parsed_json.value);
     // _ = release_history;
-    // 
+    //
 }

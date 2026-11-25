@@ -27,5 +27,5 @@ test "simple json parsing" {
         \\}
     ;
     const wow = try tryThis(ZigIndex, std.testing.allocator, value);
-    std.debug.print("{s}\n", .{ wow.master.docs orelse "" });
+    std.debug.print("{s}\n", .{wow.master.docs orelse ""});
 }
