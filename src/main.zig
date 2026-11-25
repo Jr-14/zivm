@@ -3,6 +3,10 @@ const http = std.http;
 const json = std.json;
 const fetch = @import("fetch.zig");
 
+const getIndex = fetch.getIndex;
+const getCommunityMirrors = fetch.getCommunityMirrors;
+const getRandomCommunityMirrors = fetch.getRandomCommunityMirror;
+
 const Architectures = enum {
     @"src",
     @"bootstrap",
@@ -84,7 +88,7 @@ fn fetchIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value)
     defer body.deinit();
 
     const result = try client.fetch(.{
-        .location = .{ .url = ziglang_releases },
+        .location = .{ .url = "zivm/0.1.0" },
         .method = .GET,
         .headers = .{
             .user_agent = .{
@@ -195,15 +199,24 @@ fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory
 }
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = init.arena.allocator();
+    const allocator = init.gpa;
 
-    var gpa = std.heap.DebugAllocator(.{}){};
-    defer _ = gpa.deinit();
+    var csprng: std.Random.IoSource = .{ .io = init.io };
+    const random = csprng.interface();
 
-    const temp_allocator = gpa.allocator();
-    const parsed_json = try fetchIndex(init.io, temp_allocator);
-    defer parsed_json.deinit();
+    const index = try getRandomCommunityMirrors(init.io, allocator, random);
+    var mirrors = try getCommunityMirrors(init.io, allocator);
+    defer mirrors.deinit();
 
-    const release_history = try buildHistory(allocator, parsed_json.value);
-    _ = release_history;
+    const mirror = mirrors.lines[index];
+
+    std.debug.print("{s}\n", .{mirror});
+
+    // const parsed_json = try getIndex(init.io, allocator);
+    // defer parsed_json.deinit();
+    // std.log.debug("{any}", .{parsed_json});
+
+    // const release_history = try buildHistory(allocator, parsed_json.value);
+    // _ = release_history;
+    // 
 }

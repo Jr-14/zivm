@@ -38,7 +38,7 @@ pub const Mirrors = struct {
     bytes: []u8,
     lines: [][]const u8,
 
-    fn deinit(self: *Mirrors) void {
+    pub fn deinit(self: *Mirrors) void {
         self.allocator.free(self.lines);
         self.allocator.free(self.bytes);
         self.* = undefined;
@@ -80,6 +80,14 @@ pub fn getCommunityMirrors(io: std.Io, allocator: std.mem.Allocator) !Mirrors {
     };
 }
 
+pub fn getRandomCommunityMirror(io: std.Io, allocator: std.mem.Allocator, random: std.Random) !u32 {
+    var mirrors = try getCommunityMirrors(io, allocator);
+    defer mirrors.deinit();
+    const ind = random.intRangeLessThan(u32, 0, @intCast(mirrors.lines.len));
+    std.debug.print("{d}\n", .{ ind });
+    return ind;
+}
+
 pub fn getIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value) {
     var body: std.Io.Writer.Allocating = .init(allocator);
     defer body.deinit();
@@ -96,12 +104,19 @@ pub fn getIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Valu
     return try json.parseFromSlice(json.Value, allocator, body.written(), .{ .ignore_unknown_fields = true });
 }
 
+test "getRandomCommunityMirror" {
+    const seed = std.testing.random_seed;
+    var prng = std.Random.DefaultPrng.init(seed);
+    const num = try getRandomCommunityMirror(std.testing.io, std.testing.allocator, prng.random());
+    try std.testing.expect(num > 0);
+}
+
 test "fetch community mirrors" {
     var mirrors = try getCommunityMirrors(std.testing.io, std.testing.allocator);
     defer mirrors.deinit();
 
-    for (mirrors.lines) |line| {
-        std.log.err("{s}", .{line});
+    for (mirrors.lines, 0..) |line, ind| {
+        std.debug.print("{d}:  {s}\n", .{ind, line});
     }
 }
 
