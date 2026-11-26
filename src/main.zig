@@ -220,9 +220,16 @@ pub fn main(init: std.process.Init) !void {
     var mirrors = try getCommunityMirrors(init.io, allocator);
     defer mirrors.deinit();
 
-    const mirror = mirrors.rand(random);
-
+    var mirror = mirrors.rand(random);
     std.debug.print("{s}\n", .{mirror});
+
+    mirror = mirrors.rand(random);
+    std.debug.print("{s}\n", .{mirror});
+
+    mirror = mirrors.rand(random);
+    std.debug.print("{s}\n", .{mirror});
+
+
 
     // const parsed_json = try getIndex(init.io, allocator);
     // defer parsed_json.deinit();
