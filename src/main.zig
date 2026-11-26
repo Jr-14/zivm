@@ -209,27 +209,36 @@ fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory
     return release_history;
 }
 
+fn fail(io: std.Io, comptime format: []const u8, args: anytype) !noreturn {
+    const buffer: [4096]u8 = undefined;
+    var stderr = std.Io.File.stderr().writerStreaming(io, buffer);
+    try stderr.interface.print("error: " ++ format ++ "\n", args);
+    std.process.exit(1);
+}
+
+const Command = enum {
+    version, // TODO: add version command
+    @"list-remote",
+};
+
+
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
+    const io = init.io;
+
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+
+    const command_arg = args.next() orelse try fail(io, "expected command version", .{});
+    const command = std.meta.stringToEnum(Command, command_arg);
 
     // Wondering if I can end up using std.Random.DefaultPrng since this takes a bit of time to run?
     // Is it worth the time?
-    var csprng: std.Random.IoSource = .{ .io = init.io };
+    var csprng: std.Random.IoSource = .{ .io = io};
     const random = csprng.interface();
 
-    var mirrors = try getCommunityMirrors(init.io, allocator);
+    var mirrors = try getCommunityMirrors(io, allocator);
     defer mirrors.deinit();
-
-    var mirror = mirrors.rand(random);
-    std.debug.print("{s}\n", .{mirror});
-
-    mirror = mirrors.rand(random);
-    std.debug.print("{s}\n", .{mirror});
-
-    mirror = mirrors.rand(random);
-    std.debug.print("{s}\n", .{mirror});
-
-
 
     // const parsed_json = try getIndex(init.io, allocator);
     // defer parsed_json.deinit();
