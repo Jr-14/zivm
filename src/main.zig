@@ -76,6 +76,30 @@ const ReleaseHistory = struct {
             .versions = .init(allocator),
         };
     }
+
+    pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+        var versions = self.versions.iterator();
+        while (versions.next()) |entry| {
+            const version = entry.value_ptr;
+
+            if (version.meta.version) |text| allocator.free(text);
+            if (version.meta.date) |text| allocator.free(text);
+            allocator.free(version.meta.docs);
+            if (version.meta.std_docs) |text| allocator.free(text);
+            if (version.meta.notes) |text| allocator.free(text);
+
+            var architectures_iter = version.architecture.iterator();
+            while (architectures_iter.next()) |architecture| {
+                allocator.free(architecture.key_ptr.*);
+                allocator.free(architecture.value_ptr.tarball);
+                allocator.free(architecture.value_ptr.shasum);
+            }
+            version.architecture.deinit();
+
+            allocator.free(entry.key_ptr.*);
+        }
+        self.versions.deinit();
+    }
 };
 
 /// This fetches the Full Release History of zig.
@@ -109,6 +133,7 @@ fn fetchIndex(io: std.Io, allocator: std.mem.Allocator) !json.Parsed(json.Value)
 
 fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory {
     var release_history: ReleaseHistory = .init(allocator);
+    errdefer release_history.deinit(allocator);
     switch (index) {
         .object => |obj| {
             var outer_itr = obj.iterator();
@@ -221,6 +246,18 @@ const Command = enum {
     @"list-remote",
 };
 
+fn listRemote(io: std.Io, allocator: std.mem.Allocator) !void {
+    const index_json = try fetch.getIndex(io, allocator);
+    defer index_json.deinit();
+
+    var history = try buildHistory(allocator, index_json.value);
+    defer history.deinit(allocator);
+    var iter = history.versions.keyIterator();
+    while (iter.next()) |version| {
+        std.debug.print("{s}\n", .{version.*});
+    }
+}
+
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -242,13 +279,14 @@ pub fn main(init: std.process.Init) !void {
     _ = csprng.interface();
 
     switch (command) {
-        .@"list-remote" => {
-            var mirrors = try getCommunityMirrors(io, allocator);
-            for (mirrors.lines) |mirror| {
-                std.debug.print("{s}\n", .{ mirror });
-            }
-            defer mirrors.deinit();
-        },
+        .@"list-remote" => try listRemote(io, allocator),
+        // .@"list-remote" => {
+        //     var mirrors = try getCommunityMirrors(io, allocator);
+        //     for (mirrors.lines) |mirror| {
+        //         std.debug.print("{s}\n", .{ mirror });
+        //     }
+        //     defer mirrors.deinit();
+        // },
         .version => {
             std.log.err("TODO: version command", .{});
             std.process.exit(1);
