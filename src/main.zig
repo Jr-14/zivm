@@ -210,9 +210,9 @@ fn buildHistory(allocator: std.mem.Allocator, index: json.Value) !ReleaseHistory
 }
 
 fn fail(io: std.Io, comptime format: []const u8, args: anytype) !noreturn {
-    const buffer: [4096]u8 = undefined;
-    var stderr = std.Io.File.stderr().writerStreaming(io, buffer);
-    try stderr.interface.print("error: " ++ format ++ "\n", args);
+    var buffer: [4096]u8 = undefined;
+    var stderr = std.Io.File.stderr().writerStreaming(io, &buffer);
+    try stderr.interface.print(format ++ "\n", args);
     std.process.exit(1);
 }
 
@@ -229,16 +229,31 @@ pub fn main(init: std.process.Init) !void {
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
 
-    const command_arg = args.next() orelse try fail(io, "expected command version", .{});
-    const command = std.meta.stringToEnum(Command, command_arg);
+    // Skip the first argument since it's the name of the binary
+    _ = args.next();
+
+    const usage_string = "usage: zivm <version|list-remote>\n";
+    const command_arg = args.next() orelse try fail(io, usage_string, .{});
+    const command = std.meta.stringToEnum(Command, command_arg) orelse try fail(io, "unknown command '{s}'\n" ++ usage_string, .{command_arg});
 
     // Wondering if I can end up using std.Random.DefaultPrng since this takes a bit of time to run?
     // Is it worth the time?
     var csprng: std.Random.IoSource = .{ .io = io};
-    const random = csprng.interface();
+    _ = csprng.interface();
 
-    var mirrors = try getCommunityMirrors(io, allocator);
-    defer mirrors.deinit();
+    switch (command) {
+        .@"list-remote" => {
+            var mirrors = try getCommunityMirrors(io, allocator);
+            for (mirrors.lines) |mirror| {
+                std.debug.print("{s}\n", .{ mirror });
+            }
+            defer mirrors.deinit();
+        },
+        .version => {
+            std.log.err("TODO: version command", .{});
+            std.process.exit(1);
+        },
+    }
 
     // const parsed_json = try getIndex(init.io, allocator);
     // defer parsed_json.deinit();
